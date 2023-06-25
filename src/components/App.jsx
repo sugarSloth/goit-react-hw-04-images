@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import React, { Component } from 'react';
 import { getApiResponse, requestParameters } from 'pixabayApi/pixabay-api';
 import Searchbar from './Searchbar';
 import ImageGallery from './ImageGallery';
@@ -15,38 +15,34 @@ class App extends Component {
     isLoading: false,
     error: null,
     isModalOpen: false,
+    page: 1, // Додано: Стан для сторінки
   };
 
   async componentDidUpdate(_, prevState) {
-    const {
-      state: { searchString },
-      updateGallery,
-    } = this;
+    const { searchString, page } = this.state;
 
-    if (prevState.searchString !== searchString) {
-      requestParameters.page = 1;
-      this.setState({ gallery: [] });
-
-      if (searchString !== '') {
-        this.setState({ isLoading: true });
-        updateGallery(this.state.searchString);
-      }
+    if (prevState.searchString !== searchString || prevState.page !== page) {
+      this.setState({ isLoading: true });
+      this.updateGallery(searchString, page);
     }
   }
 
   loadNextPage = () => {
-    this.setState({ isLoading: true });
-    this.updateGallery(this.state.searchString);
+    this.setState((prevState) => ({
+      page: prevState.page + 1, // Оновлення значення стану сторінки
+    }));
   };
 
-  updateGallery = searchString => {
+  updateGallery = (searchString, page) => {
     try {
-      getApiResponse(searchString).then(response => {
+      getApiResponse(searchString, page).then((response) => {
         if (response.totalHits === 0) {
           alert(`Images by your request "${searchString}" did not found`);
           return;
         } else {
-          this.setState({ gallery: [...this.state.gallery, ...response.hits] });
+          this.setState((prevState) => ({
+            gallery: [...prevState.gallery, ...response.hits], // Додавання нових картинок до галереї
+          }));
         }
       });
     } catch (error) {
@@ -56,9 +52,13 @@ class App extends Component {
     }
   };
 
-  getSearchString = value => {
+  getSearchString = (value) => {
     if (this.state.searchString !== value.searchString) {
-      this.setState({ searchString: value.searchString });
+      this.setState({
+        searchString: value.searchString,
+        gallery: [],
+        page: 1, // Скидання стану сторінки при новому пошуку
+      });
     } else {
       alert(`You are actually looking at "${value.searchString}" pictures`);
     }
@@ -76,15 +76,8 @@ class App extends Component {
   };
 
   render() {
-    const {
-      state: { gallery, isLoading, isModalOpen, largeImageURL, tags },
-      getSearchString,
-      loadNextPage,
-      openModal,
-      closeModal,
-    } = this;
-
-    console.log(isLoading); //
+    const { gallery, isLoading, isModalOpen, largeImageURL, tags } = this.state;
+    const { getSearchString, loadNextPage, openModal, closeModal } = this;
 
     return (
       <div className={css.app}>

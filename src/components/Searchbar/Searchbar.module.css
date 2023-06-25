@@ -3,7 +3,7 @@
   left: 0;
   position: sticky;
   position: -webkit-sticky;
-  z-index: 1100;
+  z-index: 10;
   display: flex;
   justify-content: center;
   align-items: center;
