@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getApiResponse } from 'pixabayApi/pixabay-api';
 import Searchbar from './Searchbar';
 import ImageGallery from './ImageGallery';
@@ -8,110 +8,99 @@ import Image from './Image';
 import Loader from './Loader';
 import css from './App.module.css';
 
-class App extends Component {
-  state = {
-    searchString: '',
-    gallery: [],
-    isLoading: false,
-    error: null,
-    isModalOpen: false,
-    currentPage: 1,
-    totalPages: 1,
-  };
+function App() {
+  const [searchString, setSearchString] = useState('');
+  const [gallery, setGallery] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [largeImageURL, setLargeImageURL] = useState(null);
+  const [tags, setTags] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  async componentDidUpdate(_, prevState) {
-    const searchString = this.state.searchString;
-    const { currentPage } = this.state;
-
-    if (
-      prevState.searchString !== searchString ||
-      prevState.currentPage !== currentPage
-    ) {
-      this.setState({ isLoading: true });
-      this.updateGallery(searchString, currentPage);
-    }
-  }
-
-  loadNextPage = () => {
-    this.setState(prevState => ({ currentPage: prevState.currentPage + 1 }));
-  };
-
-  updateGallery = async (searchString, page) => {
-    try {
-      const response = await getApiResponse(searchString, page);
-
-      if (response.totalHits === 0) {
-        alert(`Images by your request "${searchString}" did not found`);
+  useEffect(() => {
+    async function updateGallery() {
+      if (searchString.trim() === '') { // Перевірка на пустий пошуковий рядок
+        setGallery([]);
+        setTotalPages(1);
         return;
       }
 
-      this.setState(prevState => ({
-        gallery: [...prevState.gallery, ...response.hits],
-        totalPages: Math.ceil(response.totalHits / response.hitsPerPage),
-      }));
-    } catch (error) {
-      this.setState({ error });
-    } finally {
-      this.setState({ isLoading: false });
+      try {
+        setIsLoading(true);
+        const response = await getApiResponse(searchString, currentPage);
+
+        if (response.totalHits === 0) {
+          alert(`Images by your request "${searchString}" did not found`);
+          return;
+        }
+
+        setGallery(prevGallery => [...prevGallery, ...response.hits]);
+        setTotalPages(Math.ceil(response.totalHits / response.hitsPerPage));
+      } catch (error) {
+        setError(error);
+      } finally {
+        setIsLoading(false);
+      }
     }
+
+    updateGallery();
+  }, [searchString, currentPage]);
+
+  const loadNextPage = () => {
+    setCurrentPage(prevPage => prevPage + 1);
   };
 
-  getSearchString = value => {
-    if (this.state.searchString !== value.searchString) {
-      this.setState({
-        searchString: value.searchString,
-        gallery: [],
-        page: 1,
-      });
+  const getSearchString = value => {
+    const trimmedSearchString = value.searchString.trim();
+    if (searchString !== trimmedSearchString) {
+      setSearchString(trimmedSearchString);
+      setGallery([]);
+      setCurrentPage(1);
+      setError(null);
     } else {
-      alert(`You are actually looking at "${value.searchString}" pictures`);
+      alert(`You are actually looking at "${trimmedSearchString}" pictures`);
     }
   };
 
-  openModal = ({ largeImageURL, tags }) => {
-    this.setState({ isModalOpen: true, largeImageURL, tags });
+  const openModal = ({ largeImageURL, tags }) => {
+    setIsModalOpen(true);
+    setLargeImageURL(largeImageURL);
+    setTags(tags);
   };
 
-  closeModal = () => {
-    this.setState({ isModalOpen: false, largeImageURL: null, tags: null });
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setLargeImageURL(null);
+    setTags(null);
   };
 
-  render() {
-    const {
-      gallery,
-      isLoading,
-      isModalOpen,
-      largeImageURL,
-      tags,
-      currentPage,
-      totalPages,
-    } = this.state;
+  return (
+    <div className={css.app}>
+      <Searchbar onSubmit={getSearchString} />
 
-    return (
-  <div className={css.app}>
-    <Searchbar onSubmit={this.getSearchString} />
+      {isLoading && <Loader />}
 
-    {isLoading && <Loader />}
+      {gallery.length > 0 && (
+        <>
+          <ImageGallery gallery={gallery} onClick={openModal} />
 
-    {gallery.length > 0 && (
-      <>
-        <ImageGallery gallery={gallery} onClick={this.openModal} />
+          {currentPage < totalPages && (
+            <Button onClick={loadNextPage}>Load More</Button>
+          )}
+        </>
+      )}
 
-        {currentPage < totalPages && (
-          <Button onClick={this.loadNextPage}>Load More</Button>
-        )}
-      </>
-    )}
+      {isModalOpen && (
+        <Modal onClose={closeModal}>
+          <Image URL={largeImageURL} tags={tags} />
+        </Modal>
+      )}
 
-    {isModalOpen && (
-      <Modal onClose={this.closeModal}>
-        <Image URL={largeImageURL} tags={tags} />
-      </Modal>
-    )}
-  </div>
-);
-
-  }
+      {error && <p>An error occurred: {error.message}</p>}
+    </div>
+  );
 }
 
 export default App;
