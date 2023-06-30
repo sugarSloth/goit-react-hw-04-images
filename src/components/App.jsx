@@ -1,5 +1,5 @@
-import React, { Component } from 'react';
-import { getApiResponse, requestParameters } from 'pixabayApi/pixabay-api';
+import { Component } from 'react';
+import { getApiResponse } from 'pixabayApi/pixabay-api';
 import Searchbar from './Searchbar';
 import ImageGallery from './ImageGallery';
 import Button from './Button';
@@ -15,36 +15,40 @@ class App extends Component {
     isLoading: false,
     error: null,
     isModalOpen: false,
-    page: 1, // Додано: Стан для сторінки
+    currentPage: 1,
+    totalPages: 1,
   };
 
   async componentDidUpdate(_, prevState) {
-    const { searchString, page } = this.state;
+    const searchString = this.state.searchString;
+    const { currentPage } = this.state;
 
-    if (prevState.searchString !== searchString || prevState.page !== page) {
+    if (
+      prevState.searchString !== searchString ||
+      prevState.currentPage !== currentPage
+    ) {
       this.setState({ isLoading: true });
-      this.updateGallery(searchString, page);
+      this.updateGallery(searchString, currentPage);
     }
   }
 
   loadNextPage = () => {
-    this.setState((prevState) => ({
-      page: prevState.page + 1, // Оновлення значення стану сторінки
-    }));
+    this.setState(prevState => ({ currentPage: prevState.currentPage + 1 }));
   };
 
-  updateGallery = (searchString, page) => {
+  updateGallery = async (searchString, page) => {
     try {
-      getApiResponse(searchString, page).then((response) => {
-        if (response.totalHits === 0) {
-          alert(`Images by your request "${searchString}" did not found`);
-          return;
-        } else {
-          this.setState((prevState) => ({
-            gallery: [...prevState.gallery, ...response.hits], // Додавання нових картинок до галереї
-          }));
-        }
-      });
+      const response = await getApiResponse(searchString, page);
+
+      if (response.totalHits === 0) {
+        alert(`Images by your request "${searchString}" did not found`);
+        return;
+      }
+
+      this.setState(prevState => ({
+        gallery: [...prevState.gallery, ...response.hits],
+        totalPages: Math.ceil(response.totalHits / response.hitsPerPage),
+      }));
     } catch (error) {
       this.setState({ error });
     } finally {
@@ -52,12 +56,12 @@ class App extends Component {
     }
   };
 
-  getSearchString = (value) => {
+  getSearchString = value => {
     if (this.state.searchString !== value.searchString) {
       this.setState({
         searchString: value.searchString,
         gallery: [],
-        page: 1, // Скидання стану сторінки при новому пошуку
+        page: 1,
       });
     } else {
       alert(`You are actually looking at "${value.searchString}" pictures`);
@@ -65,42 +69,48 @@ class App extends Component {
   };
 
   openModal = ({ largeImageURL, tags }) => {
-    this.setState({ isModalOpen: true });
-    this.setState({ largeImageURL, tags });
+    this.setState({ isModalOpen: true, largeImageURL, tags });
   };
 
   closeModal = () => {
-    this.setState({ isModalOpen: false });
-    delete this.state.largeImageURL;
-    delete this.state.tags;
+    this.setState({ isModalOpen: false, largeImageURL: null, tags: null });
   };
 
   render() {
-    const { gallery, isLoading, isModalOpen, largeImageURL, tags } = this.state;
-    const { getSearchString, loadNextPage, openModal, closeModal } = this;
+    const {
+      gallery,
+      isLoading,
+      isModalOpen,
+      largeImageURL,
+      tags,
+      currentPage,
+      totalPages,
+    } = this.state;
 
     return (
-      <div className={css.app}>
-        <Searchbar onSubmit={getSearchString} />
+  <div className={css.app}>
+    <Searchbar onSubmit={this.getSearchString} />
 
-        {isLoading && requestParameters.page === 1 ? (
-          <Loader />
-        ) : (
-          gallery.length > 0 && (
-            <ImageGallery gallery={gallery} onClick={openModal} />
-          )
+    {isLoading && <Loader />}
+
+    {gallery.length > 0 && (
+      <>
+        <ImageGallery gallery={gallery} onClick={this.openModal} />
+
+        {currentPage < totalPages && (
+          <Button onClick={this.loadNextPage}>Load More</Button>
         )}
+      </>
+    )}
 
-        {requestParameters.page !== 1 &&
-          (isLoading ? <Loader /> : <Button onClick={loadNextPage} />)}
+    {isModalOpen && (
+      <Modal onClose={this.closeModal}>
+        <Image URL={largeImageURL} tags={tags} />
+      </Modal>
+    )}
+  </div>
+);
 
-        {isModalOpen && (
-          <Modal onClose={closeModal}>
-            <Image URL={largeImageURL} tags={tags} />
-          </Modal>
-        )}
-      </div>
-    );
   }
 }
 

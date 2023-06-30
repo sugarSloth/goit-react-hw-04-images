@@ -1,11 +1,17 @@
 import PropTypes from 'prop-types';
 import css from './Image.module.css';
 
-export default function Image({ URL, tags }) {
-  return <img className={css.image} src={URL} alt={tags} />;
-}
+export default Image;
 
 Image.propTypes = {
   URL: PropTypes.string.isRequired,
   tags: PropTypes.string,
 };
+
+function Image({ URL, tags = '' }) {
+  return (
+    <>
+      <img className={css.image} src={URL} alt={tags}></img>
+    </>
+  );
+}
